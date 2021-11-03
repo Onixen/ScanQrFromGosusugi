@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="..\:/Users/admin/Documents/GitHub/ScanQrFromGosusugi/app/src/main/res/drawable/custom_dialog_bg.xml" value="0.38125" />
+        <entry key="..\:/Users/admin/Documents/GitHub/ScanQrFromGosusugi/app/src/main/res/drawable/custom_dialog_bg_invalid.xml" value="0.38125" />
+        <entry key="..\:/Users/admin/Documents/GitHub/ScanQrFromGosusugi/app/src/main/res/drawable/custom_dialog_bg_valid.xml" value="0.38125" />
+        <entry key="..\:/Users/admin/Documents/GitHub/ScanQrFromGosusugi/app/src/main/res/layout/fragment_custom_dialog.xml" value="0.3651041666666667" />
+        <entry key="..\:/Users/admin/Documents/GitHub/ScanQrFromGosusugi/app/src/main/res/layout/main_activity.xml" value="0.3651041666666667" />
+        <entry key="..\:/Users/admin/Documents/GitHub/ScanQrFromGosusugi/app/src/main/res/layout/scan_qr_fragment.xml" value="0.3651041666666667" />
+      </map>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_11" default="true" project-jdk-name="Android Studio default JDK" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/build/classes" />
+  </component>
+  <component name="ProjectType">
+    <option name="id" value="Android" />
+  </component>
+</project>
