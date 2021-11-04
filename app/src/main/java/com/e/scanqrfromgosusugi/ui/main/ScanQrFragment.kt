@@ -7,9 +7,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
-import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
+import com.android.volley.AuthFailureError
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.budiyev.android.codescanner.AutoFocusMode
 import com.budiyev.android.codescanner.CodeScanner
 import com.budiyev.android.codescanner.DecodeCallback
@@ -22,6 +23,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.Exception
 import java.net.URL
+import java.nio.charset.StandardCharsets
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 class ScanQrFragment : Fragment() {
     val TAG = "scan_result"
@@ -42,14 +46,6 @@ class ScanQrFragment : Fragment() {
 
             // Если результат сканирования содержит ошибку или положительный результат сертификата о вакцинации ( только 1 параметр )
             if (params.size == 1) {
-                /*AlertDialog.Builder(requireContext()).apply {
-                    setTitle("Результат сканирования QR Госуслуг:")
-                    setMessage(it)
-                    setPositiveButton("Ок") { dialog, _ ->
-                        dialog.cancel()
-                        codeScanner.startPreview()
-                    }
-                } .create().show()*/
                 when {
                     params[0] == "expired" -> {
                         CustomDialogFragment(false, null).show(parentFragmentManager, "customDialog")
@@ -59,6 +55,9 @@ class ScanQrFragment : Fragment() {
                     }
                     params[0] == "error" -> {
                         CustomDialogFragment(false, null).show(parentFragmentManager, "customDialog")
+                    }
+                    params[0] == "other_error" -> {
+                        CustomDialogFragment(null, null).show(parentFragmentManager, "customDialog")
                     }
                     params[0] == "load_error" -> {
                         CustomDialogFragment(null, "Ошибка при загрузке данных").show(parentFragmentManager, "customDialog")
@@ -117,7 +116,7 @@ class ScanQrFragment : Fragment() {
             codeScanner.startPreview()
         }
         codeScanner.decodeCallback = DecodeCallback {
-            parseGosUslugi(it.text)
+                parseGosUslugiSpb(it.text)
         }
 
         // Callback для ошибок в работе сканера
@@ -128,7 +127,7 @@ class ScanQrFragment : Fragment() {
         }
     }
     //  Функция обращается к Api Госуслуг и получает информацию о COVID-тесте или истории болезни. Результат помещается в свойство viewModel.scanQrResult
-    private fun parseGosUslugi(url: String) {
+    private fun parseGosUslugiSpb(url: String) {
         GlobalScope.launch {
             // Api госуслуги для анализа на COVID-19: https://www.gosuslugi.ru/api/covid-cert/v3/cert/check/7000000015474309?lang=ru&ck=784c717b43c71fd66f292b6e1390ba04 | Пример ссылки для анализа: https://www.gosuslugi.ru/covid-cert/verify/7000000015474309?lang=ru&ck=784c717b43c71fd66f292b6e1390ba04
             // Api госуслуги сертификата о вакцинации: https://www.gosuslugi.ru/api/vaccine/v1/cert/verify/a57a91c6-be7c-4661-a1a3-daae23ee950d || Пример https://www.gosuslugi.ru/vaccine/cert/verify/a57a91c6-be7c-4661-a1a3-daae23ee950d
@@ -183,7 +182,8 @@ class ScanQrFragment : Fragment() {
                     }
                     else -> {
                         // viewModel.scanQrResult.postValue("Не корректный QR")
-                        viewModel.scanQrResult.postValue("error")
+                        parseGosUslugiMos(url)
+                        //viewModel.scanQrResult.postValue("error")
                     }
                 }
             } catch (ex: Exception) {
@@ -193,4 +193,66 @@ class ScanQrFragment : Fragment() {
             }
         }
     }
+    private fun parseGosUslugiMos(url: String) {
+
+            when {
+                url.contains("https://immune.mos.ru/qr?") -> {
+                    try {
+                        val number = url.replace("https://immune.mos.ru/qr?id=", "")
+                        val mosApiUrl = "https://immune.mos.ru/api/search_by_number_form"
+                        Log.d(TAG, "parseGosUslugiMos(): number: $number")
+
+                        val mRequestQueue = Volley.newRequestQueue(context)
+                        val mStringRequest = object: StringRequest(
+                            Method.POST,
+                            mosApiUrl,
+                            { response ->
+                                Log.d(TAG, "parseGosUslugiMos: $response")
+                                val jsonResponse = JSONObject(JSONObject(JSONObject(response).getString("result")).getString("certificate"))
+
+                                val startDate = LocalDate.parse(jsonResponse.getString("start"))
+                                val endDate = LocalDate.parse(jsonResponse.getString("end"))
+                                Log.d(TAG, "parseGosUslugiMos: startDate - $startDate endDate - $endDate")
+                                if (LocalDate.now() in startDate..endDate) {
+                                    viewModel.scanQrResult.postValue("1")
+                                    Log.d(TAG, "parseGosUslugiMos: московский QR действителен")
+                                } else {
+                                    viewModel.scanQrResult.postValue("error")
+                                }
+                            },
+                            {
+                                val errorByte = it.networkResponse.data
+                                val parseError =  errorByte.toString(StandardCharsets.UTF_8)
+                                val errorObj = JSONObject(parseError)
+                                //val errorMessage = errorObj.getString("error")
+                                Log.d(TAG, "parseGosUslugiMos(): volley error message: $errorObj")
+                                viewModel.scanQrResult.postValue( "error")
+                            }) {
+                            override fun getHeaders(): MutableMap<String, String> {
+                                val params = HashMap<String, String>()
+                                params["content-type"] = "application/json"
+                                return params
+                            }
+                            override fun getBodyContentType(): String {
+                                return "application/json"
+                            }
+                            @Throws(AuthFailureError::class)
+                            override fun getBody(): ByteArray {
+                                val params = HashMap<String, String>()
+                                params["number"] = number
+                                return JSONObject(params as Map<*, *>).toString().toByteArray()
+                            }
+                        }
+                        mRequestQueue.add(mStringRequest)
+                    }
+                    catch (ex: Exception) {
+                        viewModel.scanQrResult.postValue( "error")
+                    }
+                }
+                else -> {
+                    viewModel.scanQrResult.postValue("error")
+                }
+            }
+        }
+
 }
